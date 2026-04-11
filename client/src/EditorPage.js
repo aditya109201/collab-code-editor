@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import Editor from "@monaco-editor/react";
 
-const socket = io("http://localhost:5000");
+const socket = io("http://localhost:5001");
 
 function EditorPage() {
   const [roomId, setRoomId] = useState("");
