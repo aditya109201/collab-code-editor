@@ -58,6 +58,6 @@ app.get("/", (req, res) => {
   res.send("Collaborative Code Editor backend is running.");
 });
 
-server.listen(5000, () => {
+server.listen(5001, () => {
   console.log("Server listening on http://localhost:5000");
 });
