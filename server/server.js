@@ -15,24 +15,39 @@ const io = new Server(server, {
   }
 });
 
-// In-memory room storage
 const roomState = {};
+const socketToUser = {};
+
+function getRoomUsers(roomId) {
+  if (!roomState[roomId]) return [];
+  return roomState[roomId].users.map((user) => user.username);
+}
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on("join_room", (roomId) => {
+  socket.on("join_room", ({ roomId, username }) => {
     socket.join(roomId);
-    console.log(`${socket.id} joined room ${roomId}`);
 
     if (!roomState[roomId]) {
       roomState[roomId] = {
         code: "// Start coding here",
-        language: "javascript"
+        language: "javascript",
+        users: []
       };
     }
 
-    socket.emit("load_state", roomState[roomId]);
+    const user = { socketId: socket.id, username };
+    roomState[roomId].users.push(user);
+    socketToUser[socket.id] = { roomId, username };
+
+    socket.emit("load_state", {
+      code: roomState[roomId].code,
+      language: roomState[roomId].language
+    });
+
+    io.to(roomId).emit("user_list", getRoomUsers(roomId));
+    io.to(roomId).emit("system_message", `${username} joined the room`);
   });
 
   socket.on("code_change", ({ roomId, code }) => {
@@ -50,6 +65,28 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const userInfo = socketToUser[socket.id];
+    if (!userInfo) {
+      console.log(`User disconnected: ${socket.id}`);
+      return;
+    }
+
+    const { roomId, username } = userInfo;
+
+    if (roomState[roomId]) {
+      roomState[roomId].users = roomState[roomId].users.filter(
+        (user) => user.socketId !== socket.id
+      );
+
+      io.to(roomId).emit("user_list", getRoomUsers(roomId));
+      io.to(roomId).emit("system_message", `${username} left the room`);
+
+      if (roomState[roomId].users.length === 0) {
+        delete roomState[roomId];
+      }
+    }
+
+    delete socketToUser[socket.id];
     console.log(`User disconnected: ${socket.id}`);
   });
 });
@@ -58,6 +95,8 @@ app.get("/", (req, res) => {
   res.send("Collaborative Code Editor backend is running.");
 });
 
-server.listen(5001, () => {
-  console.log("Server listening on http://localhost:5001");
+const PORT = process.env.PORT || 5001;
+
+server.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
 });
